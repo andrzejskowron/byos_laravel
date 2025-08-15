@@ -1,6 +1,6 @@
 services:
     app:
-        image: ghcr.io/usetrmnl/byos_laravel:latest
+        image: ghcr.io/andrzejskowron/byos_laravel:skip-failed-polling
         ports:
             - "4567:8080"
         environment:
@@ -15,4 +15,3 @@ services:
 volumes:
     database:
     storage:
-
