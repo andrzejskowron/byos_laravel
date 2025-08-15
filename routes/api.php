@@ -91,9 +91,13 @@ Route::get('/display', function (Request $request) {
 
                         $plugin->refresh();
 
+                        // Verify that we actually have a valid image after processing
                         if ($plugin->current_image !== null) {
                             $playlistItem->update(['last_displayed_at' => now()]);
                             $device->update(['current_screen_image' => $plugin->current_image]);
+                        } else {
+                            // If no image was generated, treat this as a failure
+                            throw new \Exception("Plugin failed to generate image despite successful polling");
                         }
                     } catch (\Exception $e) {
                         // Plugin failed, try to find a working playlist item
@@ -129,6 +133,8 @@ Route::get('/display', function (Request $request) {
                                         $nextPlaylistItem->update(['last_displayed_at' => now()]);
                                         $device->update(['current_screen_image' => $nextPlugin->current_image]);
                                         break; // Success! Exit the retry loop
+                                    } else {
+                                        throw new \Exception("Plugin failed to generate image despite successful polling");
                                     }
                                 } else {
                                     // Handle mashup case
@@ -148,6 +154,8 @@ Route::get('/display', function (Request $request) {
                                     if ($device->current_screen_image !== null) {
                                         $nextPlaylistItem->update(['last_displayed_at' => now()]);
                                         break; // Success! Exit the retry loop
+                                    } else {
+                                        throw new \Exception("Mashup failed to generate image despite successful polling");
                                     }
                                 }
                             } catch (\Exception $nextE) {

@@ -70,4 +70,48 @@ class PollingErrorHandlingTest extends TestCase
         $this->assertEquals(['temperature' => 25, 'humidity' => 60], $plugin->data_payload);
         $this->assertNotNull($plugin->data_payload_updated_at);
     }
+
+    public function test_plugin_polling_validates_xkcd_response()
+    {
+        // Mock response that looks successful but has incorrect XKCD data
+        Http::fake([
+            'https://api.allorigins.win/get?url=https://xkcd.com/info.0.json' => Http::response([
+                'status' => ['http_code' => 200],
+                'contents' => '{"error": "Comic not found"}'
+            ], 200),
+        ]);
+
+        $plugin = Plugin::factory()->create([
+            'data_strategy' => 'polling',
+            'polling_url' => 'https://api.allorigins.win/get?url=https://xkcd.com/info.0.json',
+            'polling_verb' => 'get',
+        ]);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Response data missing expected XKCD fields');
+
+        $plugin->updateDataPayload();
+    }
+
+    public function test_plugin_polling_validates_allorigins_error()
+    {
+        // Mock allorigins response with HTTP error
+        Http::fake([
+            'https://api.allorigins.win/get?url=https://xkcd.com/info.0.json' => Http::response([
+                'status' => ['http_code' => 404],
+                'contents' => 'Not Found'
+            ], 200),
+        ]);
+
+        $plugin = Plugin::factory()->create([
+            'data_strategy' => 'polling',
+            'polling_url' => 'https://api.allorigins.win/get?url=https://xkcd.com/info.0.json',
+            'polling_verb' => 'get',
+        ]);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Proxied request failed with HTTP code: 404');
+
+        $plugin->updateDataPayload();
+    }
 }
