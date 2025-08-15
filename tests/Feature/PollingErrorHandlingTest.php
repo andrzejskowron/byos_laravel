@@ -71,46 +71,59 @@ class PollingErrorHandlingTest extends TestCase
         $this->assertNotNull($plugin->data_payload_updated_at);
     }
 
-    public function test_plugin_polling_validates_xkcd_response()
+    public function test_plugin_polling_handles_informational_status_codes()
     {
-        // Mock response that looks successful but has incorrect XKCD data
+        // Mock 1xx informational response (should fail)
         Http::fake([
-            'https://api.allorigins.win/get?url=https://xkcd.com/info.0.json' => Http::response([
-                'status' => ['http_code' => 200],
-                'contents' => '{"error": "Comic not found"}'
-            ], 200),
+            'https://api.example.com/data' => Http::response(['data' => 'test'], 102), // 102 Processing
         ]);
 
         $plugin = Plugin::factory()->create([
             'data_strategy' => 'polling',
-            'polling_url' => 'https://api.allorigins.win/get?url=https://xkcd.com/info.0.json',
+            'polling_url' => 'https://api.example.com/data',
             'polling_verb' => 'get',
         ]);
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Response data missing expected XKCD fields');
+        $this->expectExceptionMessage('HTTP request failed with status: 102');
 
         $plugin->updateDataPayload();
     }
 
-    public function test_plugin_polling_validates_allorigins_error()
+    public function test_plugin_polling_handles_client_error_status_codes()
     {
-        // Mock allorigins response with HTTP error
+        // Mock 4xx client error response (should fail)
         Http::fake([
-            'https://api.allorigins.win/get?url=https://xkcd.com/info.0.json' => Http::response([
-                'status' => ['http_code' => 404],
-                'contents' => 'Not Found'
-            ], 200),
+            'https://api.example.com/data' => Http::response(['error' => 'Not found'], 404),
         ]);
 
         $plugin = Plugin::factory()->create([
             'data_strategy' => 'polling',
-            'polling_url' => 'https://api.allorigins.win/get?url=https://xkcd.com/info.0.json',
+            'polling_url' => 'https://api.example.com/data',
             'polling_verb' => 'get',
         ]);
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Proxied request failed with HTTP code: 404');
+        $this->expectExceptionMessage('HTTP request failed with status: 404');
+
+        $plugin->updateDataPayload();
+    }
+
+    public function test_plugin_polling_handles_server_error_status_codes()
+    {
+        // Mock 5xx server error response (should fail)
+        Http::fake([
+            'https://api.example.com/data' => Http::response(['error' => 'Internal server error'], 500),
+        ]);
+
+        $plugin = Plugin::factory()->create([
+            'data_strategy' => 'polling',
+            'polling_url' => 'https://api.example.com/data',
+            'polling_verb' => 'get',
+        ]);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('HTTP request failed with status: 500');
 
         $plugin->updateDataPayload();
     }

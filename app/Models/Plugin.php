@@ -82,9 +82,10 @@ class Plugin extends Model
                     $response = $httpRequest->get($this->polling_url);
                 }
 
-                // Check if the response was successful
-                if (!$response->successful()) {
-                    throw new \Exception("HTTP request failed with status: " . $response->status());
+                // Check if the response was successful (not 1xx, 4xx, or 5xx)
+                $statusCode = $response->status();
+                if (($statusCode >= 100 && $statusCode <= 199) || ($statusCode >= 400 && $statusCode <= 599)) {
+                    throw new \Exception("HTTP request failed with status: " . $statusCode);
                 }
 
                 $responseData = $response->json();
@@ -94,9 +95,6 @@ class Plugin extends Model
                     throw new \Exception("Invalid JSON response received from polling URL");
                 }
 
-                // Validate the response data structure
-                $this->validateResponseData($responseData);
-
                 $this->update([
                     'data_payload' => $responseData,
                     'data_payload_updated_at' => now(),
@@ -105,55 +103,6 @@ class Plugin extends Model
                 // Re-throw the exception so the calling code can handle it
                 throw $e;
             }
-        }
-    }
-
-    /**
-     * Validate the response data to ensure it's in the expected format
-     * This helps catch cases where the API returns "successful" responses with incorrect data
-     */
-    private function validateResponseData($responseData): void
-    {
-        // For XKCD API through allorigins, we expect specific structure
-        if (is_array($responseData)) {
-            // Check for allorigins.win wrapper format
-            if (isset($responseData['status']) && isset($responseData['contents'])) {
-                // This is an allorigins response, validate the contents
-                if ($responseData['status']['http_code'] !== 200) {
-                    throw new \Exception("Proxied request failed with HTTP code: " . $responseData['status']['http_code']);
-                }
-
-                $contents = $responseData['contents'];
-                if (is_string($contents)) {
-                    $decodedContents = json_decode($contents, true);
-                    if ($decodedContents === null) {
-                        throw new \Exception("Proxied response contains invalid JSON in contents field");
-                    }
-                    // For XKCD, we expect certain fields
-                    if (!isset($decodedContents['img']) || !isset($decodedContents['title'])) {
-                        throw new \Exception("Response data missing expected XKCD fields (img, title)");
-                    }
-                }
-            }
-            // Check for direct XKCD API format
-            elseif (isset($responseData['img']) && isset($responseData['title'])) {
-                // Direct XKCD format is valid
-                return;
-            }
-            // Check for error responses that might look "successful"
-            elseif (isset($responseData['error']) || isset($responseData['message'])) {
-                $errorMsg = $responseData['error'] ?? $responseData['message'] ?? 'Unknown error';
-                throw new \Exception("API returned error response: " . $errorMsg);
-            }
-            // If it's an array but doesn't match expected patterns, it might be invalid
-            elseif (empty($responseData) || (count($responseData) === 1 && isset($responseData[0]) && is_string($responseData[0]))) {
-                throw new \Exception("Response data appears to be in unexpected format");
-            }
-        }
-
-        // If responseData is null or empty, that's also problematic
-        if (empty($responseData) && $responseData !== 0 && $responseData !== false) {
-            throw new \Exception("Response data is empty or null");
         }
     }
 
