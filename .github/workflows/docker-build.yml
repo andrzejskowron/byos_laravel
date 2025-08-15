@@ -3,6 +3,10 @@ name: Build and Push Docker Images
 on:
   release:
     types: [published]
+  push:
+    branches:
+      - skip-failed-polling
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -19,9 +23,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract version from tag
+      - name: Extract version or branch name
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+          fi
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -42,8 +51,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=tag
-            latest
+            type=raw,value=${{ env.VERSION }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
