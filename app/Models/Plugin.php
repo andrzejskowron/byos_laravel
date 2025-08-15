@@ -74,17 +74,34 @@ class Plugin extends Model
                 $httpRequest = $httpRequest->withBody($this->polling_body);
             }
 
-            // Make the request based on the verb
-            if ($this->polling_verb === 'post') {
-                $response = $httpRequest->post($this->polling_url)->json();
-            } else {
-                $response = $httpRequest->get($this->polling_url)->json();
-            }
+            try {
+                // Make the request based on the verb
+                if ($this->polling_verb === 'post') {
+                    $response = $httpRequest->post($this->polling_url);
+                } else {
+                    $response = $httpRequest->get($this->polling_url);
+                }
 
-            $this->update([
-                'data_payload' => $response,
-                'data_payload_updated_at' => now(),
-            ]);
+                // Check if the response was successful
+                if (!$response->successful()) {
+                    throw new \Exception("HTTP request failed with status: " . $response->status());
+                }
+
+                $responseData = $response->json();
+
+                // Check if we got valid JSON data
+                if ($responseData === null && $response->body() !== 'null') {
+                    throw new \Exception("Invalid JSON response received from polling URL");
+                }
+
+                $this->update([
+                    'data_payload' => $responseData,
+                    'data_payload_updated_at' => now(),
+                ]);
+            } catch (\Exception $e) {
+                // Re-throw the exception so the calling code can handle it
+                throw $e;
+            }
         }
     }
 

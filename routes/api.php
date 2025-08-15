@@ -80,41 +80,173 @@ Route::get('/display', function (Request $request) {
                     // Reset cache if Devices with different dimensions exist
                     ImageGenerationService::resetIfNotCacheable($plugin);
 
-                    // Check and update stale data if needed
-                    if ($plugin->isDataStale() || $plugin->current_image === null) {
-                        $plugin->updateDataPayload();
-                        $markup = $plugin->render();
+                    try {
+                        // Check and update stale data if needed
+                        if ($plugin->isDataStale() || $plugin->current_image === null) {
+                            $plugin->updateDataPayload();
+                            $markup = $plugin->render();
 
-                        GenerateScreenJob::dispatchSync($device->id, $plugin->id, $markup);
-                    }
+                            GenerateScreenJob::dispatchSync($device->id, $plugin->id, $markup);
+                        }
 
-                    $plugin->refresh();
+                        $plugin->refresh();
 
-                    if ($plugin->current_image !== null) {
+                        if ($plugin->current_image !== null) {
+                            $playlistItem->update(['last_displayed_at' => now()]);
+                            $device->update(['current_screen_image' => $plugin->current_image]);
+                        }
+                    } catch (\Exception $e) {
+                        // Plugin failed, try to find a working playlist item
                         $playlistItem->update(['last_displayed_at' => now()]);
-                        $device->update(['current_screen_image' => $plugin->current_image]);
+
+                        // Keep trying playlist items until we find one that works
+                        $attempts = 0;
+                        $maxAttempts = 10; // Prevent infinite loops
+                        $currentFailedItem = $playlistItem;
+
+                        while ($attempts < $maxAttempts) {
+                            $currentFailedItem->update(['last_displayed_at' => now()]);
+                            $nextPlaylistItem = $device->getNextPlaylistItem();
+
+                            if (!$nextPlaylistItem || $nextPlaylistItem->id === $playlistItem->id) {
+                                break; // We've cycled through all items or no items available
+                            }
+
+                            try {
+                                if (!$nextPlaylistItem->isMashup()) {
+                                    $nextPlugin = $nextPlaylistItem->plugin;
+                                    ImageGenerationService::resetIfNotCacheable($nextPlugin);
+
+                                    if ($nextPlugin->isDataStale() || $nextPlugin->current_image === null) {
+                                        $nextPlugin->updateDataPayload();
+                                        $nextMarkup = $nextPlugin->render();
+                                        GenerateScreenJob::dispatchSync($device->id, $nextPlugin->id, $nextMarkup);
+                                    }
+
+                                    $nextPlugin->refresh();
+
+                                    if ($nextPlugin->current_image !== null) {
+                                        $nextPlaylistItem->update(['last_displayed_at' => now()]);
+                                        $device->update(['current_screen_image' => $nextPlugin->current_image]);
+                                        break; // Success! Exit the retry loop
+                                    }
+                                } else {
+                                    // Handle mashup case
+                                    $nextPlugins = Plugin::whereIn('id', $nextPlaylistItem->getMashupPluginIds())->get();
+                                    foreach ($nextPlugins as $nextPlugin) {
+                                        ImageGenerationService::resetIfNotCacheable($nextPlugin);
+                                        if ($nextPlugin->isDataStale() || $nextPlugin->current_image === null) {
+                                            $nextPlugin->updateDataPayload();
+                                        }
+                                    }
+
+                                    $nextMarkup = $nextPlaylistItem->render();
+                                    GenerateScreenJob::dispatchSync($device->id, null, $nextMarkup);
+
+                                    $device->refresh();
+
+                                    if ($device->current_screen_image !== null) {
+                                        $nextPlaylistItem->update(['last_displayed_at' => now()]);
+                                        break; // Success! Exit the retry loop
+                                    }
+                                }
+                            } catch (\Exception $nextE) {
+                                // This item failed too, continue to next iteration
+                                $currentFailedItem = $nextPlaylistItem;
+                                $attempts++;
+                                continue;
+                            }
+
+                            $attempts++;
+                        }
                     }
                 } elseif ($playlistItem) {
                     $refreshTimeOverride = $playlistItem->playlist()->first()->refresh_time;
 
-                    // Get all plugins for the mashup
-                    $plugins = Plugin::whereIn('id', $playlistItem->getMashupPluginIds())->get();
+                    try {
+                        // Get all plugins for the mashup
+                        $plugins = Plugin::whereIn('id', $playlistItem->getMashupPluginIds())->get();
 
-                    foreach ($plugins as $plugin) {
-                        // Reset cache if Devices with different dimensions exist
-                        ImageGenerationService::resetIfNotCacheable($plugin);
-                        if ($plugin->isDataStale() || $plugin->current_image === null) {
-                            $plugin->updateDataPayload();
+                        foreach ($plugins as $plugin) {
+                            // Reset cache if Devices with different dimensions exist
+                            ImageGenerationService::resetIfNotCacheable($plugin);
+                            if ($plugin->isDataStale() || $plugin->current_image === null) {
+                                $plugin->updateDataPayload();
+                            }
                         }
-                    }
 
-                    $markup = $playlistItem->render();
-                    GenerateScreenJob::dispatchSync($device->id, null, $markup);
+                        $markup = $playlistItem->render();
+                        GenerateScreenJob::dispatchSync($device->id, null, $markup);
 
-                    $device->refresh();
+                        $device->refresh();
 
-                    if ($device->current_screen_image !== null) {
+                        if ($device->current_screen_image !== null) {
+                            $playlistItem->update(['last_displayed_at' => now()]);
+                        }
+                    } catch (\Exception $e) {
+                        // Mashup failed, try to find a working playlist item
                         $playlistItem->update(['last_displayed_at' => now()]);
+
+                        // Keep trying playlist items until we find one that works
+                        $attempts = 0;
+                        $maxAttempts = 10; // Prevent infinite loops
+                        $currentFailedItem = $playlistItem;
+
+                        while ($attempts < $maxAttempts) {
+                            $currentFailedItem->update(['last_displayed_at' => now()]);
+                            $nextPlaylistItem = $device->getNextPlaylistItem();
+
+                            if (!$nextPlaylistItem || $nextPlaylistItem->id === $playlistItem->id) {
+                                break; // We've cycled through all items or no items available
+                            }
+
+                            try {
+                                if (!$nextPlaylistItem->isMashup()) {
+                                    $nextPlugin = $nextPlaylistItem->plugin;
+                                    ImageGenerationService::resetIfNotCacheable($nextPlugin);
+
+                                    if ($nextPlugin->isDataStale() || $nextPlugin->current_image === null) {
+                                        $nextPlugin->updateDataPayload();
+                                        $nextMarkup = $nextPlugin->render();
+                                        GenerateScreenJob::dispatchSync($device->id, $nextPlugin->id, $nextMarkup);
+                                    }
+
+                                    $nextPlugin->refresh();
+
+                                    if ($nextPlugin->current_image !== null) {
+                                        $nextPlaylistItem->update(['last_displayed_at' => now()]);
+                                        $device->update(['current_screen_image' => $nextPlugin->current_image]);
+                                        break; // Success! Exit the retry loop
+                                    }
+                                } else {
+                                    // Handle mashup case
+                                    $nextPlugins = Plugin::whereIn('id', $nextPlaylistItem->getMashupPluginIds())->get();
+                                    foreach ($nextPlugins as $nextPlugin) {
+                                        ImageGenerationService::resetIfNotCacheable($nextPlugin);
+                                        if ($nextPlugin->isDataStale() || $nextPlugin->current_image === null) {
+                                            $nextPlugin->updateDataPayload();
+                                        }
+                                    }
+
+                                    $nextMarkup = $nextPlaylistItem->render();
+                                    GenerateScreenJob::dispatchSync($device->id, null, $nextMarkup);
+
+                                    $device->refresh();
+
+                                    if ($device->current_screen_image !== null) {
+                                        $nextPlaylistItem->update(['last_displayed_at' => now()]);
+                                        break; // Success! Exit the retry loop
+                                    }
+                                }
+                            } catch (\Exception $nextE) {
+                                // This item failed too, continue to next iteration
+                                $currentFailedItem = $nextPlaylistItem;
+                                $attempts++;
+                                continue;
+                            }
+
+                            $attempts++;
+                        }
                     }
                 }
             }
