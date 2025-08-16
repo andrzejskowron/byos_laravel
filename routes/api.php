@@ -77,17 +77,25 @@ Route::get('/display', function (Request $request) {
                 if ($playlistItem && ! $playlistItem->isMashup()) {
                     $refreshTimeOverride = $playlistItem->playlist()->first()->refresh_time;
                     $plugin = $playlistItem->plugin;
+                    Log::info("Processing plugin {$plugin->id} (name: {$plugin->name}) from playlist");
 
                     // Reset cache if Devices with different dimensions exist
                     ImageGenerationService::resetIfNotCacheable($plugin);
 
                     try {
                         // Check and update stale data if needed
-                        if ($plugin->isDataStale() || $plugin->current_image === null) {
+                        $isStale = $plugin->isDataStale();
+                        $hasImage = $plugin->current_image !== null;
+                        Log::info("Plugin {$plugin->id}: isStale={$isStale}, hasImage={$hasImage}, polling_url={$plugin->polling_url}");
+
+                        if ($isStale || !$hasImage) {
+                            Log::info("Plugin {$plugin->id}: Updating data payload and generating image");
                             $plugin->updateDataPayload();
                             $markup = $plugin->render();
 
                             GenerateScreenJob::dispatchSync($device->id, $plugin->id, $markup);
+                        } else {
+                            Log::info("Plugin {$plugin->id}: Using cached data and image");
                         }
 
                         $plugin->refresh();
