@@ -17,11 +17,14 @@ Route::get('/display', function (Request $request) {
     Log::info('=== DISPLAY ENDPOINT CALLED ===');
     $mac_address = $request->header('id');
     $access_token = $request->header('access-token');
+    Log::info("Device request: mac={$mac_address}, token=" . substr($access_token ?? 'null', 0, 8) . "...");
+
     $device = Device::where('mac_address', $mac_address)
         ->where('api_key', $access_token)
         ->first();
 
     if (! $device) {
+        Log::info("Device not found for mac={$mac_address}");
         // Check if there's a user with assign_new_devices enabled
         $auto_assign_user = User::where('assign_new_devices', true)->first();
 
@@ -43,6 +46,8 @@ Route::get('/display', function (Request $request) {
         }
     }
 
+    Log::info("Device found: id={$device->id}, name={$device->name}, proxy_cloud={$device->proxy_cloud}");
+
     $device->update([
         'last_rssi_level' => $request->header('rssi'),
         'last_battery_voltage' => $request->header('battery_voltage'),
@@ -59,19 +64,25 @@ Route::get('/display', function (Request $request) {
     }
 
     if ($device->isPauseActive()) {
+        Log::info("Device is paused - showing sleep image");
         $image_path = 'images/sleep.png';
         $filename = 'sleep.png';
         $refreshTimeOverride = (int) now()->diffInSeconds($device->pause_until);
     } elseif ($device->isSleepModeActive()) {
+        Log::info("Device is in sleep mode - showing sleep image");
         $image_path = 'images/sleep.png';
         $filename = 'sleep.png';
         $refreshTimeOverride = $device->getSleepModeEndsInSeconds() ?? $device->default_refresh_interval;
     } else {
         // Get current screen image from a mirror device or continue if not available
         if (! $image_uuid = $device->mirrorDevice?->current_screen_image) {
+            Log::info("No mirror device - checking proxy_cloud and playlist");
             $refreshTimeOverride = null;
             // Skip if cloud proxy is enabled for the device
-            if (! $device->proxy_cloud || $device->getNextPlaylistItem()) {
+            $hasPlaylistItem = $device->getNextPlaylistItem() !== null;
+            Log::info("proxy_cloud={$device->proxy_cloud}, hasPlaylistItem={$hasPlaylistItem}");
+
+            if (! $device->proxy_cloud || $hasPlaylistItem) {
                 $playlistItem = $device->getNextPlaylistItem();
 
                 if ($playlistItem && ! $playlistItem->isMashup()) {
