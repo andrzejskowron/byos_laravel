@@ -38,6 +38,13 @@
         <livewire:actions.device-auto-join/>
     </flux:navbar>
 
+    <!-- Version indicator -->
+    <div class="text-xs text-zinc-500 dark:text-zinc-400 mr-4 max-lg:hidden">
+        <span title="Skip Failed Polling Branch - Last updated: {{ now()->format('Y-m-d H:i:s') }}">
+            skip-failed-polling | {{ now()->format('M j, H:i') }}
+        </span>
+    </div>
+
     <!-- Desktop User Menu -->
     <flux:dropdown position="top" align="end">
         <flux:profile
@@ -115,6 +122,13 @@
     </flux:navlist>
 
     <flux:spacer/>
+
+    <!-- Mobile Version indicator -->
+    <div class="text-xs text-zinc-500 dark:text-zinc-400 px-4 py-2">
+        <span title="Skip Failed Polling Branch - Last updated: {{ now()->format('Y-m-d H:i:s') }}">
+            skip-failed-polling | {{ now()->format('M j, H:i') }}
+        </span>
+    </div>
 
     <flux:navlist variant="outline">
         <livewire:actions.device-auto-join/>
