@@ -84,7 +84,10 @@ class Plugin extends Model
 
                 // Check if the response was successful (not 1xx, 4xx, or 5xx)
                 $statusCode = $response->status();
+                \Log::info("Plugin {$this->id} polling response status: {$statusCode}");
+
                 if (($statusCode >= 100 && $statusCode <= 199) || ($statusCode >= 400 && $statusCode <= 599)) {
+                    \Log::error("Plugin {$this->id} polling failed with status {$statusCode}, throwing exception");
                     throw new \Exception("HTTP request failed with status: " . $statusCode);
                 }
 

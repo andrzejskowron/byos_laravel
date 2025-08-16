@@ -97,6 +97,7 @@ Route::get('/display', function (Request $request) {
                         }
                     } catch (\Exception $e) {
                         // Plugin failed, try to find a working playlist item
+                        Log::error("Plugin {$plugin->id} failed: {$e->getMessage()}. Trying next playlist item.");
                         $playlistItem->update(['last_displayed_at' => now()]);
 
                         // Keep trying playlist items until we find one that works
