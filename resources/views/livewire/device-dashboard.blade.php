@@ -13,6 +13,14 @@ new class extends Component {
 <div>
     <div class="bg-muted flex flex-col items-center justify-center gap-6 p-6 md:p-10">
         <div class="flex w-full max-w-3xl flex-col gap-6">
+            <!-- Version indicator for dashboard -->
+            <div class="text-center">
+                <div class="inline-block px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
+                    <span title="Skip Failed Polling Branch - Build: {{ now()->format('Y-m-d H:i:s') }}">
+                        🚀 skip-failed-polling branch | {{ now()->format('M j, H:i') }}
+                    </span>
+                </div>
+            </div>
             @if($devices->isEmpty())
                 <div class="flex flex-col gap-6">
                     <div
