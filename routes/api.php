@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 Route::get('/display', function (Request $request) {
+    Log::info('=== DISPLAY ENDPOINT CALLED ===');
     $mac_address = $request->header('id');
     $access_token = $request->header('access-token');
     $device = Device::where('mac_address', $mac_address)
