@@ -21,7 +21,7 @@ new class extends Component {
 
     // Filtering and sorting properties
     public string $search = '';
-    public string $sortBy = 'name_asc';
+    public string $sortBy = 'date_asc';
 
     public array $native_plugins = [
         'markup' =>
@@ -51,6 +51,8 @@ new class extends Component {
             $allPlugins = array_filter($allPlugins, function($plugin) use ($searchLower) {
                 return str_contains(mb_strtolower($plugin['name'] ?? ''), $searchLower);
             });
+            // Re-index array after filtering to avoid key gaps
+            $allPlugins = array_values($allPlugins);
         }
 
         // Apply sorting
@@ -205,10 +207,10 @@ new class extends Component {
             </div>
             <div class="sm:w-64">
                 <flux:select wire:model.live="sortBy">
+                    <option value="date_asc">Oldest First</option>
+                    <option value="date_desc">Newest First</option>
                     <option value="name_asc">Name (A-Z)</option>
                     <option value="name_desc">Name (Z-A)</option>
-                    <option value="date_desc">Newest First</option>
-                    <option value="date_asc">Oldest First</option>
                 </flux:select>
             </div>
         </div>
