@@ -104,6 +104,17 @@ new class extends Component {
         $this->refreshPlugins();
     }
 
+    // Lifecycle hooks to trigger refresh when search or sort changes
+    public function updatedSearch(): void
+    {
+        $this->refreshPlugins();
+    }
+
+    public function updatedSortBy(): void
+    {
+        $this->refreshPlugins();
+    }
+
     public function addPlugin(): void
     {
         abort_unless(auth()->user() !== null, 403);
