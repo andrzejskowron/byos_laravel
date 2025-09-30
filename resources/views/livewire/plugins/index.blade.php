@@ -212,20 +212,20 @@ new class extends Component {
         </div>
 
         <!-- Filter and Sort Controls -->
-        <div class="mb-6 flex flex-col sm:flex-row gap-4">
+        <div class="mb-6 flex flex-col sm:flex-row gap-4" x-data="{ searchValue: @entangle('search'), sortValue: @entangle('sortBy') }">
             <div class="flex-1">
                 <input
                     type="text"
-                    wire:model.live.debounce.300ms="search"
+                    x-model="searchValue"
                     placeholder="Search plugins by name (min. 2 characters)..."
                     class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    x-on:input="console.log('Search input changed:', $event.target.value)"
+                    x-on:input.debounce.300ms="console.log('Search changed to:', searchValue)"
                 />
             </div>
             <div class="sm:w-64">
-                <select wire:model.live="sortBy"
+                <select x-model="sortValue"
                     class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    x-on:change="console.log('Sort changed:', $event.target.value)">
+                    x-on:change="console.log('Sort changed to:', sortValue)">
                     <option value="date_asc">Oldest First</option>
                     <option value="date_desc">Newest First</option>
                     <option value="name_asc">Name (A-Z)</option>
