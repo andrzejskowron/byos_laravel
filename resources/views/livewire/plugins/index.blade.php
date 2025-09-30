@@ -19,8 +19,7 @@ new class extends Component {
     public $polling_body;
     public $zipFile;
 
-    // Filtering and sorting properties
-    public string $search = '';
+    // Sorting property (filtering is done client-side with Alpine.js)
     public string $sortBy = 'date_asc';
 
     public array $native_plugins = [
@@ -43,36 +42,14 @@ new class extends Component {
     #[Computed(persist: false, cache: false)]
     public function plugins()
     {
-        \Log::info('plugins() computed called', [
-            'search' => $this->search,
-            'search_length' => strlen($this->search),
-            'sortBy' => $this->sortBy
-        ]);
-
         $userPlugins = auth()->user()?->plugins?->makeHidden(['render_markup', 'data_payload'])->toArray();
         $allPlugins = array_merge($this->native_plugins, $userPlugins ?? []);
 
         // Convert to indexed array to avoid issues with associative keys
         $allPlugins = array_values($allPlugins);
 
-        \Log::info('Before filtering', ['count' => count($allPlugins)]);
-
-        // Apply filtering (only if search is longer than 1 character)
-        if (strlen($this->search) > 1) {
-            $searchLower = mb_strtolower($this->search);
-            \Log::info('Applying filter', ['searchLower' => $searchLower]);
-            $allPlugins = array_values(array_filter($allPlugins, function($plugin) use ($searchLower) {
-                return str_contains(mb_strtolower($plugin['name'] ?? ''), $searchLower);
-            }));
-            \Log::info('After filtering', ['count' => count($allPlugins)]);
-        } else {
-            \Log::info('NOT applying filter - search too short');
-        }
-
-        // Apply sorting
+        // Apply sorting (filtering is done client-side with Alpine.js)
         $allPlugins = $this->sortPlugins($allPlugins);
-
-        \Log::info('Final result', ['count' => count($allPlugins)]);
 
         return $allPlugins;
     }
@@ -120,20 +97,6 @@ new class extends Component {
     public function mount(): void
     {
         // Computed property will auto-load
-    }
-
-    // Lifecycle hook to trim search value
-    public function updatedSearch(): void
-    {
-        \Log::info('updatedSearch called', [
-            'search_before_trim' => $this->search,
-            'search_length' => strlen($this->search)
-        ]);
-        $this->search = trim($this->search);
-        \Log::info('updatedSearch after trim', [
-            'search_after_trim' => $this->search,
-            'search_length' => strlen($this->search)
-        ]);
     }
 
     public function addPlugin(): void
@@ -221,29 +184,27 @@ new class extends Component {
         <!-- Filter and Sort Controls -->
         <div class="mb-6 flex flex-col sm:flex-row gap-4">
             <div class="flex-1">
-                <input
-                    type="text"
+                <flux:input
                     x-model="searchTerm"
                     placeholder="Search plugins by name (min. 2 characters)..."
-                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    icon="magnifying-glass"
                 />
             </div>
             <div class="sm:w-64">
-                <select wire:model.live="sortBy"
-                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                <flux:select wire:model.live="sortBy">
                     <option value="date_asc">Oldest First</option>
                     <option value="date_desc">Newest First</option>
                     <option value="name_asc">Name (A-Z)</option>
                     <option value="name_desc">Name (Z-A)</option>
-                </select>
+                </flux:select>
             </div>
         </div>
 
-        <template x-if="searchTerm.length > 1">
-            <div class="mb-4">
-                <p class="text-sm text-zinc-600 dark:text-zinc-400" x-text="`Showing ${filterPlugins($this->plugins).length} result${filterPlugins($this->plugins).length !== 1 ? 's' : ''} for '${searchTerm}'`"></p>
-            </div>
-        </template>
+        <div x-show="searchTerm.length > 1" class="mb-4" style="display: none;">
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+                <span x-text="'Showing results for: ' + searchTerm"></span>
+            </p>
+        </div>
 
         <flux:modal name="import-zip" class="md:w-96">
             <div class="space-y-6">
@@ -390,7 +351,8 @@ new class extends Component {
             @foreach($allPlugins as $index => $plugin)
                 <div
                     wire:key="plugin-{{ $plugin['id'] ?? $plugin['name'] ?? $index }}"
-                    x-show="searchTerm.length <= 1 || '{{ strtolower($plugin['name']) }}'.includes(searchTerm.toLowerCase())"
+                    x-data="{ pluginName: {{ json_encode(strtolower($plugin['name'] ?? '')) }} }"
+                    x-show="searchTerm.length <= 1 || pluginName.includes(searchTerm.toLowerCase())"
                     class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
                     <a href="{{ ($plugin['detail_view_route']) ? route($plugin['detail_view_route']) : route('plugins.recipe', ['plugin' => $plugin['id']]) }}"
                        class="block">
