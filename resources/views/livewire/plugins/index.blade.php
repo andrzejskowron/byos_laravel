@@ -5,7 +5,6 @@ use App\Services\PluginImportService;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Str;
-use Livewire\Attributes\Computed;
 
 new class extends Component {
     use WithFileUploads;
@@ -40,8 +39,7 @@ new class extends Component {
         'polling_body' => 'nullable|string',
     ];
 
-    #[Computed]
-    public function plugins()
+    public function getFilteredAndSortedPlugins()
     {
         $userPlugins = auth()->user()?->plugins?->makeHidden(['render_markup', 'data_payload'])->toArray();
         $allPlugins = array_merge($this->native_plugins, $userPlugins ?? []);
@@ -208,10 +206,14 @@ new class extends Component {
             </div>
         </div>
 
+        @php
+            $plugins = $this->getFilteredAndSortedPlugins();
+        @endphp
+
         @if(strlen($search) > 1)
             <div class="mb-4">
                 <flux:text class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Showing {{ count($this->plugins) }} result{{ count($this->plugins) !== 1 ? 's' : '' }} for "{{ $search }}"
+                    Showing {{ count($plugins) }} result{{ count($plugins) !== 1 ? 's' : '' }} for "{{ $search }}"
                 </flux:text>
             </div>
         @endif
@@ -353,9 +355,9 @@ new class extends Component {
             </div>
         </flux:modal>
 
-        @if(count($this->plugins) > 0)
+        @if(count($plugins) > 0)
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                @foreach($this->plugins as $plugin)
+                @foreach($plugins as $plugin)
                     <div
                         class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
                         <a href="{{ ($plugin['detail_view_route']) ? route($plugin['detail_view_route']) : route('plugins.recipe', ['plugin' => $plugin['id']]) }}"
