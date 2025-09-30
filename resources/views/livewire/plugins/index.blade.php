@@ -211,7 +211,7 @@ new class extends Component {
         @if(strlen($search) > 1)
             <div class="mb-4">
                 <flux:text class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Showing {{ count($plugins) }} result{{ count($plugins) !== 1 ? 's' : '' }} for "{{ $search }}"
+                    Showing {{ count($this->plugins) }} result{{ count($this->plugins) !== 1 ? 's' : '' }} for "{{ $search }}"
                 </flux:text>
             </div>
         @endif
@@ -353,9 +353,9 @@ new class extends Component {
             </div>
         </flux:modal>
 
-        @if(count($plugins) > 0)
+        @if(count($this->plugins) > 0)
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                @foreach($plugins as $plugin)
+                @foreach($this->plugins as $plugin)
                     <div
                         class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
                         <a href="{{ ($plugin['detail_view_route']) ? route($plugin['detail_view_route']) : route('plugins.recipe', ['plugin' => $plugin['id']]) }}"
