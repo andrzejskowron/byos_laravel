@@ -19,6 +19,10 @@ new class extends Component {
     public array $plugins;
     public $zipFile;
 
+    // Filtering and sorting properties
+    public string $search = '';
+    public string $sortBy = 'name_asc';
+
     public array $native_plugins = [
         'markup' =>
             ['name' => 'Markup', 'flux_icon_name' => 'code-bracket', 'detail_view_route' => 'plugins.markup'],
@@ -39,7 +43,60 @@ new class extends Component {
     public function refreshPlugins(): void
     {
         $userPlugins = auth()->user()?->plugins?->makeHidden(['render_markup', 'data_payload'])->toArray();
-        $this->plugins = array_merge($this->native_plugins, $userPlugins ?? []);
+        $allPlugins = array_merge($this->native_plugins, $userPlugins ?? []);
+
+        // Apply filtering (only if search is longer than 1 character)
+        if (strlen($this->search) > 1) {
+            $searchLower = mb_strtolower($this->search);
+            $allPlugins = array_filter($allPlugins, function($plugin) use ($searchLower) {
+                return str_contains(mb_strtolower($plugin['name'] ?? ''), $searchLower);
+            });
+        }
+
+        // Apply sorting
+        $allPlugins = $this->sortPlugins($allPlugins);
+
+        $this->plugins = $allPlugins;
+    }
+
+    protected function sortPlugins(array $plugins): array
+    {
+        // Convert to indexed array for sorting
+        $pluginsToSort = array_values($plugins);
+
+        switch ($this->sortBy) {
+            case 'name_asc':
+                usort($pluginsToSort, function($a, $b) {
+                    return strcasecmp($a['name'] ?? '', $b['name'] ?? '');
+                });
+                break;
+
+            case 'name_desc':
+                usort($pluginsToSort, function($a, $b) {
+                    return strcasecmp($b['name'] ?? '', $a['name'] ?? '');
+                });
+                break;
+
+            case 'date_desc': // Newest first
+                usort($pluginsToSort, function($a, $b) {
+                    // Native plugins don't have created_at, put them at the end
+                    $aDate = $a['created_at'] ?? '1970-01-01';
+                    $bDate = $b['created_at'] ?? '1970-01-01';
+                    return strcmp($bDate, $aDate);
+                });
+                break;
+
+            case 'date_asc': // Oldest first
+                usort($pluginsToSort, function($a, $b) {
+                    // Native plugins don't have created_at, put them at the beginning
+                    $aDate = $a['created_at'] ?? '1970-01-01';
+                    $bDate = $b['created_at'] ?? '1970-01-01';
+                    return strcmp($aDate, $bDate);
+                });
+                break;
+        }
+
+        return $pluginsToSort;
     }
 
     public function mount(): void
@@ -124,9 +181,34 @@ new class extends Component {
                     </flux:menu>
                 </flux:dropdown>
             </flux:button.group>
-
-
         </div>
+
+        <!-- Filter and Sort Controls -->
+        <div class="mb-6 flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <flux:input
+                    wire:model.live.debounce.300ms="search"
+                    placeholder="Search plugins by name (min. 2 characters)..."
+                    icon="magnifying-glass"
+                />
+            </div>
+            <div class="sm:w-64">
+                <flux:select wire:model.live="sortBy">
+                    <option value="name_asc">Name (A-Z)</option>
+                    <option value="name_desc">Name (Z-A)</option>
+                    <option value="date_desc">Newest First</option>
+                    <option value="date_asc">Oldest First</option>
+                </flux:select>
+            </div>
+        </div>
+
+        @if(strlen($search) > 1)
+            <div class="mb-4">
+                <flux:text class="text-sm text-zinc-600 dark:text-zinc-400">
+                    Showing {{ count($plugins) }} result{{ count($plugins) !== 1 ? 's' : '' }} for "{{ $search }}"
+                </flux:text>
+            </div>
+        @endif
 
         <flux:modal name="import-zip" class="md:w-96">
             <div class="space-y-6">
@@ -265,20 +347,34 @@ new class extends Component {
             </div>
         </flux:modal>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            @foreach($plugins as $plugin)
-                <div
-                    class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
-                    <a href="{{ ($plugin['detail_view_route']) ? route($plugin['detail_view_route']) : route('plugins.recipe', ['plugin' => $plugin['id']]) }}"
-                       class="block">
-                        <div class="flex items-center space-x-4 px-10 py-8">
-                            <flux:icon name="{{$plugin['flux_icon_name'] ?? 'puzzle-piece'}}"
-                                       class="text-4xl text-accent"/>
-                            <h3 class="text-lg font-medium dark:text-zinc-200">{{$plugin['name']}}</h3>
-                        </div>
-                    </a>
-                </div>
-            @endforeach
-        </div>
+        @if(count($plugins) > 0)
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                @foreach($plugins as $plugin)
+                    <div
+                        class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
+                        <a href="{{ ($plugin['detail_view_route']) ? route($plugin['detail_view_route']) : route('plugins.recipe', ['plugin' => $plugin['id']]) }}"
+                           class="block">
+                            <div class="flex items-center space-x-4 px-10 py-8">
+                                <flux:icon name="{{$plugin['flux_icon_name'] ?? 'puzzle-piece'}}"
+                                           class="text-4xl text-accent"/>
+                                <h3 class="text-lg font-medium dark:text-zinc-200">{{$plugin['name']}}</h3>
+                            </div>
+                        </a>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <div class="text-center py-12">
+                <flux:icon name="magnifying-glass" class="mx-auto h-12 w-12 text-zinc-400 dark:text-zinc-600"/>
+                <h3 class="mt-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">No plugins found</h3>
+                <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    @if(strlen($search) > 1)
+                        No plugins match your search "{{ $search }}". Try a different search term.
+                    @else
+                        Get started by adding your first plugin.
+                    @endif
+                </p>
+            </div>
+        @endif
     </div>
 </div>
