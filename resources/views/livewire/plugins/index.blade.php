@@ -41,22 +41,36 @@ new class extends Component {
 
     public function getFilteredAndSortedPlugins()
     {
+        \Log::info('getFilteredAndSortedPlugins called', [
+            'search' => $this->search,
+            'search_length' => strlen($this->search),
+            'sortBy' => $this->sortBy
+        ]);
+
         $userPlugins = auth()->user()?->plugins?->makeHidden(['render_markup', 'data_payload'])->toArray();
         $allPlugins = array_merge($this->native_plugins, $userPlugins ?? []);
 
         // Convert to indexed array to avoid issues with associative keys
         $allPlugins = array_values($allPlugins);
 
+        \Log::info('Before filtering', ['count' => count($allPlugins)]);
+
         // Apply filtering (only if search is longer than 1 character)
         if (strlen($this->search) > 1) {
             $searchLower = mb_strtolower($this->search);
+            \Log::info('Applying filter', ['searchLower' => $searchLower]);
             $allPlugins = array_values(array_filter($allPlugins, function($plugin) use ($searchLower) {
                 return str_contains(mb_strtolower($plugin['name'] ?? ''), $searchLower);
             }));
+            \Log::info('After filtering', ['count' => count($allPlugins)]);
+        } else {
+            \Log::info('NOT applying filter - search too short');
         }
 
         // Apply sorting
         $allPlugins = $this->sortPlugins($allPlugins);
+
+        \Log::info('Final result', ['count' => count($allPlugins)]);
 
         return $allPlugins;
     }
@@ -109,7 +123,15 @@ new class extends Component {
     // Lifecycle hook to trim search value
     public function updatedSearch(): void
     {
+        \Log::info('updatedSearch called', [
+            'search_before_trim' => $this->search,
+            'search_length' => strlen($this->search)
+        ]);
         $this->search = trim($this->search);
+        \Log::info('updatedSearch after trim', [
+            'search_after_trim' => $this->search,
+            'search_length' => strlen($this->search)
+        ]);
     }
 
     public function addPlugin(): void
@@ -194,10 +216,11 @@ new class extends Component {
                     wire:model.live.debounce.300ms="search"
                     placeholder="Search plugins by name (min. 2 characters)..."
                     icon="magnifying-glass"
+                    x-on:input="console.log('Search input changed:', $event.target.value)"
                 />
             </div>
             <div class="sm:w-64">
-                <flux:select wire:model.live="sortBy">
+                <flux:select wire:model.live="sortBy" x-on:change="console.log('Sort changed:', $event.target.value)">
                     <option value="date_asc">Oldest First</option>
                     <option value="date_desc">Newest First</option>
                     <option value="name_asc">Name (A-Z)</option>
@@ -205,6 +228,11 @@ new class extends Component {
                 </flux:select>
             </div>
         </div>
+
+        <script>
+            console.log('Current search value:', @js($search));
+            console.log('Current sortBy value:', @js($sortBy));
+        </script>
 
         @php
             $plugins = $this->getFilteredAndSortedPlugins();
