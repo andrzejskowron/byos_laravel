@@ -40,7 +40,7 @@ new class extends Component {
         'polling_body' => 'nullable|string',
     ];
 
-    #[Computed(persist: false)]
+    #[Computed(persist: false, cache: false)]
     public function plugins()
     {
         \Log::info('plugins() computed called', [
@@ -186,7 +186,14 @@ new class extends Component {
 };
 ?>
 
-<div class="py-12">
+<div class="py-12" x-data="{
+    searchTerm: '',
+    filterPlugins(plugins) {
+        if (this.searchTerm.length <= 1) return plugins;
+        const search = this.searchTerm.toLowerCase();
+        return plugins.filter(p => p.name.toLowerCase().includes(search));
+    }
+}">
     <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-semibold dark:text-gray-100">Plugins &amp; Recipes</h2>
@@ -212,20 +219,18 @@ new class extends Component {
         </div>
 
         <!-- Filter and Sort Controls -->
-        <div class="mb-6 flex flex-col sm:flex-row gap-4" x-data="{ searchValue: @entangle('search'), sortValue: @entangle('sortBy') }">
+        <div class="mb-6 flex flex-col sm:flex-row gap-4">
             <div class="flex-1">
                 <input
                     type="text"
-                    x-model="searchValue"
+                    x-model="searchTerm"
                     placeholder="Search plugins by name (min. 2 characters)..."
                     class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    x-on:input.debounce.300ms="console.log('Search changed to:', searchValue)"
                 />
             </div>
             <div class="sm:w-64">
-                <select x-model="sortValue"
-                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    x-on:change="console.log('Sort changed to:', sortValue)">
+                <select wire:model.live="sortBy"
+                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                     <option value="date_asc">Oldest First</option>
                     <option value="date_desc">Newest First</option>
                     <option value="name_asc">Name (A-Z)</option>
@@ -234,18 +239,11 @@ new class extends Component {
             </div>
         </div>
 
-        <script>
-            console.log('Current search value:', @js($search));
-            console.log('Current sortBy value:', @js($sortBy));
-        </script>
-
-        @if(strlen($search) > 1)
+        <template x-if="searchTerm.length > 1">
             <div class="mb-4">
-                <flux:text class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Showing {{ count($this->plugins) }} result{{ count($this->plugins) !== 1 ? 's' : '' }} for "{{ $search }}"
-                </flux:text>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400" x-text="`Showing ${filterPlugins($this->plugins).length} result${filterPlugins($this->plugins).length !== 1 ? 's' : ''} for '${searchTerm}'`"></p>
             </div>
-        @endif
+        </template>
 
         <flux:modal name="import-zip" class="md:w-96">
             <div class="space-y-6">
@@ -384,35 +382,26 @@ new class extends Component {
             </div>
         </flux:modal>
 
-        @if(count($this->plugins) > 0)
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                @foreach($this->plugins as $index => $plugin)
-                    <div
-                        wire:key="plugin-{{ $plugin['id'] ?? $plugin['name'] ?? $index }}"
-                        class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
-                        <a href="{{ ($plugin['detail_view_route']) ? route($plugin['detail_view_route']) : route('plugins.recipe', ['plugin' => $plugin['id']]) }}"
-                           class="block">
-                            <div class="flex items-center space-x-4 px-10 py-8">
-                                <flux:icon name="{{$plugin['flux_icon_name'] ?? 'puzzle-piece'}}"
-                                           class="text-4xl text-accent"/>
-                                <h3 class="text-lg font-medium dark:text-zinc-200">{{$plugin['name']}}</h3>
-                            </div>
-                        </a>
-                    </div>
-                @endforeach
-            </div>
-        @else
-            <div class="text-center py-12">
-                <flux:icon name="magnifying-glass" class="mx-auto h-12 w-12 text-zinc-400 dark:text-zinc-600"/>
-                <h3 class="mt-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">No plugins found</h3>
-                <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                    @if(strlen($search) > 1)
-                        No plugins match your search "{{ $search }}". Try a different search term.
-                    @else
-                        Get started by adding your first plugin.
-                    @endif
-                </p>
-            </div>
-        @endif
+        @php
+            $allPlugins = $this->plugins;
+        @endphp
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            @foreach($allPlugins as $index => $plugin)
+                <div
+                    wire:key="plugin-{{ $plugin['id'] ?? $plugin['name'] ?? $index }}"
+                    x-show="searchTerm.length <= 1 || '{{ strtolower($plugin['name']) }}'.includes(searchTerm.toLowerCase())"
+                    class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
+                    <a href="{{ ($plugin['detail_view_route']) ? route($plugin['detail_view_route']) : route('plugins.recipe', ['plugin' => $plugin['id']]) }}"
+                       class="block">
+                        <div class="flex items-center space-x-4 px-10 py-8">
+                            <flux:icon name="{{$plugin['flux_icon_name'] ?? 'puzzle-piece'}}"
+                                       class="text-4xl text-accent"/>
+                            <h3 class="text-lg font-medium dark:text-zinc-200">{{$plugin['name']}}</h3>
+                        </div>
+                    </a>
+                </div>
+            @endforeach
+        </div>
     </div>
 </div>
