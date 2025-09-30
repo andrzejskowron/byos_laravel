@@ -5,6 +5,7 @@ use App\Services\PluginImportService;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 
 new class extends Component {
     use WithFileUploads;
@@ -21,7 +22,6 @@ new class extends Component {
     // Filtering and sorting properties
     public string $search = '';
     public string $sortBy = 'date_asc';
-    public array $plugins = [];
 
     public array $native_plugins = [
         'markup' =>
@@ -40,9 +40,10 @@ new class extends Component {
         'polling_body' => 'nullable|string',
     ];
 
-    public function refreshPlugins()
+    #[Computed(persist: false)]
+    public function plugins()
     {
-        \Log::info('refreshPlugins called', [
+        \Log::info('plugins() computed called', [
             'search' => $this->search,
             'search_length' => strlen($this->search),
             'sortBy' => $this->sortBy
@@ -73,7 +74,7 @@ new class extends Component {
 
         \Log::info('Final result', ['count' => count($allPlugins)]);
 
-        $this->plugins = $allPlugins;
+        return $allPlugins;
     }
 
     protected function sortPlugins(array $plugins): array
@@ -118,10 +119,10 @@ new class extends Component {
 
     public function mount(): void
     {
-        $this->refreshPlugins();
+        // Computed property will auto-load
     }
 
-    // Lifecycle hook to trim search value and refresh
+    // Lifecycle hook to trim search value
     public function updatedSearch(): void
     {
         \Log::info('updatedSearch called', [
@@ -133,13 +134,6 @@ new class extends Component {
             'search_after_trim' => $this->search,
             'search_length' => strlen($this->search)
         ]);
-        $this->refreshPlugins();
-    }
-
-    public function updatedSortBy(): void
-    {
-        \Log::info('updatedSortBy called', ['sortBy' => $this->sortBy]);
-        $this->refreshPlugins();
     }
 
     public function addPlugin(): void
@@ -181,7 +175,6 @@ new class extends Component {
         try {
             $plugin = $pluginImportService->importFromZip($this->zipFile, auth()->user());
 
-            $this->refreshPlugins();
             $this->reset(['zipFile']);
 
             Flux::modal('import-zip')->close();
@@ -221,20 +214,23 @@ new class extends Component {
         <!-- Filter and Sort Controls -->
         <div class="mb-6 flex flex-col sm:flex-row gap-4">
             <div class="flex-1">
-                <flux:input
+                <input
+                    type="text"
                     wire:model.live.debounce.300ms="search"
                     placeholder="Search plugins by name (min. 2 characters)..."
-                    icon="magnifying-glass"
+                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     x-on:input="console.log('Search input changed:', $event.target.value)"
                 />
             </div>
             <div class="sm:w-64">
-                <flux:select wire:model.live="sortBy" x-on:change="console.log('Sort changed:', $event.target.value)">
+                <select wire:model.live="sortBy"
+                    class="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    x-on:change="console.log('Sort changed:', $event.target.value)">
                     <option value="date_asc">Oldest First</option>
                     <option value="date_desc">Newest First</option>
                     <option value="name_asc">Name (A-Z)</option>
                     <option value="name_desc">Name (Z-A)</option>
-                </flux:select>
+                </select>
             </div>
         </div>
 
@@ -246,7 +242,7 @@ new class extends Component {
         @if(strlen($search) > 1)
             <div class="mb-4">
                 <flux:text class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Showing {{ count($plugins) }} result{{ count($plugins) !== 1 ? 's' : '' }} for "{{ $search }}"
+                    Showing {{ count($this->plugins) }} result{{ count($this->plugins) !== 1 ? 's' : '' }} for "{{ $search }}"
                 </flux:text>
             </div>
         @endif
@@ -388,9 +384,9 @@ new class extends Component {
             </div>
         </flux:modal>
 
-        @if(count($plugins) > 0)
+        @if(count($this->plugins) > 0)
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                @foreach($plugins as $index => $plugin)
+                @foreach($this->plugins as $index => $plugin)
                     <div
                         wire:key="plugin-{{ $plugin['id'] ?? $plugin['name'] ?? $index }}"
                         class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
