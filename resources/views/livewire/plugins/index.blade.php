@@ -21,6 +21,7 @@ new class extends Component {
     // Filtering and sorting properties
     public string $search = '';
     public string $sortBy = 'date_asc';
+    public array $plugins = [];
 
     public array $native_plugins = [
         'markup' =>
@@ -39,9 +40,9 @@ new class extends Component {
         'polling_body' => 'nullable|string',
     ];
 
-    public function getFilteredAndSortedPlugins()
+    public function refreshPlugins()
     {
-        \Log::info('getFilteredAndSortedPlugins called', [
+        \Log::info('refreshPlugins called', [
             'search' => $this->search,
             'search_length' => strlen($this->search),
             'sortBy' => $this->sortBy
@@ -72,7 +73,7 @@ new class extends Component {
 
         \Log::info('Final result', ['count' => count($allPlugins)]);
 
-        return $allPlugins;
+        $this->plugins = $allPlugins;
     }
 
     protected function sortPlugins(array $plugins): array
@@ -117,10 +118,10 @@ new class extends Component {
 
     public function mount(): void
     {
-        // Computed property will handle plugin loading automatically
+        $this->refreshPlugins();
     }
 
-    // Lifecycle hook to trim search value
+    // Lifecycle hook to trim search value and refresh
     public function updatedSearch(): void
     {
         \Log::info('updatedSearch called', [
@@ -132,6 +133,13 @@ new class extends Component {
             'search_after_trim' => $this->search,
             'search_length' => strlen($this->search)
         ]);
+        $this->refreshPlugins();
+    }
+
+    public function updatedSortBy(): void
+    {
+        \Log::info('updatedSortBy called', ['sortBy' => $this->sortBy]);
+        $this->refreshPlugins();
     }
 
     public function addPlugin(): void
@@ -173,6 +181,7 @@ new class extends Component {
         try {
             $plugin = $pluginImportService->importFromZip($this->zipFile, auth()->user());
 
+            $this->refreshPlugins();
             $this->reset(['zipFile']);
 
             Flux::modal('import-zip')->close();
@@ -233,10 +242,6 @@ new class extends Component {
             console.log('Current search value:', @js($search));
             console.log('Current sortBy value:', @js($sortBy));
         </script>
-
-        @php
-            $plugins = $this->getFilteredAndSortedPlugins();
-        @endphp
 
         @if(strlen($search) > 1)
             <div class="mb-4">
@@ -385,8 +390,9 @@ new class extends Component {
 
         @if(count($plugins) > 0)
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                @foreach($plugins as $plugin)
+                @foreach($plugins as $index => $plugin)
                     <div
+                        wire:key="plugin-{{ $plugin['id'] ?? $plugin['name'] ?? $index }}"
                         class="rounded-xl border bg-white dark:bg-stone-950 dark:border-stone-800 text-stone-800 shadow-xs">
                         <a href="{{ ($plugin['detail_view_route']) ? route($plugin['detail_view_route']) : route('plugins.recipe', ['plugin' => $plugin['id']]) }}"
                            class="block">
