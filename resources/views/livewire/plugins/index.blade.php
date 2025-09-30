@@ -5,6 +5,7 @@ use App\Services\PluginImportService;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 
 new class extends Component {
     use WithFileUploads;
@@ -16,7 +17,6 @@ new class extends Component {
     public string $polling_verb = "get";
     public $polling_header;
     public $polling_body;
-    public array $plugins;
     public $zipFile;
 
     // Filtering and sorting properties
@@ -40,25 +40,27 @@ new class extends Component {
         'polling_body' => 'nullable|string',
     ];
 
-    public function refreshPlugins(): void
+    #[Computed]
+    public function plugins()
     {
         $userPlugins = auth()->user()?->plugins?->makeHidden(['render_markup', 'data_payload'])->toArray();
         $allPlugins = array_merge($this->native_plugins, $userPlugins ?? []);
 
+        // Convert to indexed array to avoid issues with associative keys
+        $allPlugins = array_values($allPlugins);
+
         // Apply filtering (only if search is longer than 1 character)
         if (strlen($this->search) > 1) {
             $searchLower = mb_strtolower($this->search);
-            $allPlugins = array_filter($allPlugins, function($plugin) use ($searchLower) {
+            $allPlugins = array_values(array_filter($allPlugins, function($plugin) use ($searchLower) {
                 return str_contains(mb_strtolower($plugin['name'] ?? ''), $searchLower);
-            });
-            // Re-index array after filtering to avoid key gaps
-            $allPlugins = array_values($allPlugins);
+            }));
         }
 
         // Apply sorting
         $allPlugins = $this->sortPlugins($allPlugins);
 
-        $this->plugins = $allPlugins;
+        return $allPlugins;
     }
 
     protected function sortPlugins(array $plugins): array
@@ -103,18 +105,13 @@ new class extends Component {
 
     public function mount(): void
     {
-        $this->refreshPlugins();
+        // Computed property will handle plugin loading automatically
     }
 
-    // Lifecycle hooks to trigger refresh when search or sort changes
+    // Lifecycle hook to trim search value
     public function updatedSearch(): void
     {
-        $this->refreshPlugins();
-    }
-
-    public function updatedSortBy(): void
-    {
-        $this->refreshPlugins();
+        $this->search = trim($this->search);
     }
 
     public function addPlugin(): void
@@ -135,7 +132,6 @@ new class extends Component {
         ]);
 
         $this->reset(['name', 'data_stale_minutes', 'data_strategy', 'polling_url', 'polling_verb', 'polling_header', 'polling_body']);
-        $this->refreshPlugins();
 
         Flux::modal('add-plugin')->close();
     }
@@ -143,8 +139,6 @@ new class extends Component {
     public function seedExamplePlugins(): void
     {
         Artisan::call(ExampleRecipesSeederCommand::class, ['user_id' => auth()->id()]);
-        $this->refreshPlugins();
-
     }
 
 
@@ -159,7 +153,6 @@ new class extends Component {
         try {
             $plugin = $pluginImportService->importFromZip($this->zipFile, auth()->user());
 
-            $this->refreshPlugins();
             $this->reset(['zipFile']);
 
             Flux::modal('import-zip')->close();
@@ -289,7 +282,7 @@ new class extends Component {
                     </flux:heading>
                     <flux:subheading>Browse and install Recipes from the community. Add yours <a href="https://github.com/bnussbau/trmnl-recipe-catalog" class="underline" target="_blank">here</a>.</flux:subheading>
                 </div>
-                <livewire:catalog.index @plugin-installed="refreshPlugins" />
+                <livewire:catalog.index @plugin-installed="$refresh" />
             </div>
         </flux:modal>
 
