@@ -1,17 +1,12 @@
 name: Build and Push Docker Images
 
 on:
-  push:
-    branches:
-      - main
   release:
-    types:
-      - published
-  workflow_dispatch:
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/byos_laravel
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -23,6 +18,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -37,15 +36,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version from tag (if release)
-        id: get_version
-        run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          else
-            echo "VERSION=latest" >> $GITHUB_ENV
-          fi
-
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -53,8 +43,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=tag
-            type=raw,value=latest,enable=${{ github.event_name != 'release' }}
-            type=semver,format=raw,prerelease=false,include=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
