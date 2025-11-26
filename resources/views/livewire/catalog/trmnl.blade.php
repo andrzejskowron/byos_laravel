@@ -199,18 +199,10 @@ class extends Component {
         <div class="text-center py-8">
             <flux:icon name="exclamation-triangle" class="mx-auto h-12 w-12 text-gray-400" />
             <flux:heading class="mt-2">No recipes found</flux:heading>
-            <flux:subheading>Try a different search term or check if TRMNL service is available</flux:subheading>
-            @if(config('app.debug'))
-                <p class="text-xs text-gray-500 mt-2">Debug: Recipe count: {{ count($recipes) }}</p>
-                <p class="text-xs text-gray-500">Search term: "{{ $search }}"</p>
-            @endif
+            <flux:subheading>Try a different search term</flux:subheading>
         </div>
     @else
         <div class="grid grid-cols-1 gap-4">
-            @if(config('app.debug'))
-                <flux:callout variant="info" icon="information-circle" heading="Debug: {{ count($recipes) }} recipes loaded" />
-            @endif
-
             @foreach($recipes as $recipe)
                 <div class="bg-white dark:bg-white/10 border border-zinc-200 dark:border-white/10 [:where(&)]:p-6 [:where(&)]:rounded-xl space-y-6">
                     <div class="flex items-start space-x-4">
@@ -264,10 +256,7 @@ class extends Component {
                                     </flux:modal.trigger>
                                 @endif
 
-                                <!-- DEBUG: This should always be visible -->
-                                <flux:button variant="ghost" size="sm">
-                                    🔍 TEST
-                                </flux:button>
+
 
                                 @if($recipe['detail_url'])
                                     <flux:button
@@ -288,11 +277,8 @@ class extends Component {
     <!-- Preview Modal -->
     <flux:modal name="trmnl-catalog-preview" class="min-w-[850px] min-h-[480px] space-y-6">
         @if($previewingRecipe && !empty($previewData))
-            <div class="flex items-center justify-between">
+            <div>
                 <flux:heading size="lg">Preview {{ $previewData['name'] ?? 'Recipe' }}</flux:heading>
-                <flux:modal.close>
-                    <flux:button wire:click="closePreview" variant="ghost" icon="x-mark"></flux:button>
-                </flux:modal.close>
             </div>
 
             <div class="space-y-4">
@@ -333,24 +319,22 @@ class extends Component {
                     </div>
                 @endif
 
-                <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center space-x-3">
-                        @if($previewData['detail_url'])
-                            <flux:button
-                                href="{{ $previewData['detail_url'] }}"
-                                target="_blank"
-                                variant="subtle">
-                                View on TRMNL
-                            </flux:button>
-                        @endif
-                        <flux:modal.close>
-                            <flux:button
-                                wire:click="installPlugin('{{ $previewingRecipe }}')"
-                                variant="primary">
-                                Install Recipe
-                            </flux:button>
-                        </flux:modal.close>
-                    </div>
+                <div class="flex items-center justify-end pt-4 border-t border-gray-200 dark:border-gray-700 space-x-3">
+                    @if($previewData['detail_url'])
+                        <flux:button
+                            href="{{ $previewData['detail_url'] }}"
+                            target="_blank"
+                            variant="subtle">
+                            View on TRMNL
+                        </flux:button>
+                    @endif
+                    <flux:modal.close>
+                        <flux:button
+                            wire:click="installPlugin('{{ $previewingRecipe }}')"
+                            variant="primary">
+                            Install Recipe
+                        </flux:button>
+                    </flux:modal.close>
                 </div>
             </div>
         @endif

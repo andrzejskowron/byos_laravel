@@ -151,18 +151,10 @@ class extends Component {
         <div class="text-center py-8">
             <flux:icon name="exclamation-triangle" class="mx-auto h-12 w-12 text-gray-400" />
             <flux:heading class="mt-2">No plugins available</flux:heading>
-            <flux:subheading>Catalog is empty or failed to load</flux:subheading>
-            @if(config('app.debug'))
-                <p class="text-xs text-gray-500 mt-2">Debug: Catalog URL: {{ config('app.catalog_url') }}</p>
-                <p class="text-xs text-gray-500">Plugin count: {{ count($catalogPlugins) }}</p>
-            @endif
+            <flux:subheading>Catalog is empty</flux:subheading>
         </div>
     @else
         <div class="grid grid-cols-1 gap-4">
-            @if(config('app.debug'))
-                <flux:callout variant="info" icon="information-circle" heading="Debug: {{ count($catalogPlugins) }} plugins loaded" />
-            @endif
-
             @error('installation')
                 <flux:callout variant="danger" icon="x-circle" heading="{{$message}}" />
             @enderror
@@ -218,10 +210,7 @@ class extends Component {
                                     </flux:button>
                                 </flux:modal.trigger>
 
-                                <!-- DEBUG: This should always be visible -->
-                                <flux:button variant="ghost" size="sm">
-                                    🔍 TEST
-                                </flux:button>
+
 
                                 @if($plugin['learn_more_url'])
                                     <flux:button
@@ -242,11 +231,8 @@ class extends Component {
     <!-- Preview Modal -->
     <flux:modal name="catalog-preview" class="min-w-[850px] min-h-[480px] space-y-6">
         @if($previewingPlugin && !empty($previewData))
-            <div class="flex items-center justify-between">
+            <div>
                 <flux:heading size="lg">Preview {{ $previewData['name'] ?? 'Plugin' }}</flux:heading>
-                <flux:modal.close>
-                    <flux:button wire:click="closePreview" variant="ghost" icon="x-mark"></flux:button>
-                </flux:modal.close>
             </div>
 
             <div class="space-y-4">
@@ -277,12 +263,7 @@ class extends Component {
                     </div>
                 @endif
 
-                <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <flux:modal.close>
-                        <flux:button wire:click="closePreview" variant="subtle">
-                            Back to Catalog
-                        </flux:button>
-                    </flux:modal.close>
+                <div class="flex items-center justify-end pt-4 border-t border-gray-200 dark:border-gray-700 space-x-3">
                     <flux:modal.close>
                         <flux:button
                             wire:click="installPlugin('{{ $previewingPlugin }}')"
