@@ -218,6 +218,11 @@ class extends Component {
                                     </flux:button>
                                 </flux:modal.trigger>
 
+                                <!-- DEBUG: This should always be visible -->
+                                <flux:button variant="ghost" size="sm">
+                                    🔍 TEST
+                                </flux:button>
+
                                 @if($plugin['learn_more_url'])
                                     <flux:button
                                         href="{{ $plugin['learn_more_url'] }}"

@@ -264,6 +264,11 @@ class extends Component {
                                     </flux:modal.trigger>
                                 @endif
 
+                                <!-- DEBUG: This should always be visible -->
+                                <flux:button variant="ghost" size="sm">
+                                    🔍 TEST
+                                </flux:button>
+
                                 @if($recipe['detail_url'])
                                     <flux:button
                                         href="{{ $recipe['detail_url'] }}"
@@ -329,11 +334,6 @@ class extends Component {
                 @endif
 
                 <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <flux:modal.close>
-                        <flux:button wire:click="closePreview" variant="subtle">
-                            Back to Catalog
-                        </flux:button>
-                    </flux:modal.close>
                     <div class="flex items-center space-x-3">
                         @if($previewData['detail_url'])
                             <flux:button
