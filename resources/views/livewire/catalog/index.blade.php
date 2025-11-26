@@ -151,10 +151,18 @@ class extends Component {
         <div class="text-center py-8">
             <flux:icon name="exclamation-triangle" class="mx-auto h-12 w-12 text-gray-400" />
             <flux:heading class="mt-2">No plugins available</flux:heading>
-            <flux:subheading>Catalog is empty</flux:subheading>
+            <flux:subheading>Catalog is empty or failed to load</flux:subheading>
+            @if(config('app.debug'))
+                <p class="text-xs text-gray-500 mt-2">Debug: Catalog URL: {{ config('app.catalog_url') }}</p>
+                <p class="text-xs text-gray-500">Plugin count: {{ count($catalogPlugins) }}</p>
+            @endif
         </div>
     @else
         <div class="grid grid-cols-1 gap-4">
+            @if(config('app.debug'))
+                <flux:callout variant="info" icon="information-circle" heading="Debug: {{ count($catalogPlugins) }} plugins loaded" />
+            @endif
+
             @error('installation')
                 <flux:callout variant="danger" icon="x-circle" heading="{{$message}}" />
             @enderror

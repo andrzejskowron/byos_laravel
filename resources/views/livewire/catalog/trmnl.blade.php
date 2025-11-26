@@ -199,10 +199,18 @@ class extends Component {
         <div class="text-center py-8">
             <flux:icon name="exclamation-triangle" class="mx-auto h-12 w-12 text-gray-400" />
             <flux:heading class="mt-2">No recipes found</flux:heading>
-            <flux:subheading>Try a different search term</flux:subheading>
+            <flux:subheading>Try a different search term or check if TRMNL service is available</flux:subheading>
+            @if(config('app.debug'))
+                <p class="text-xs text-gray-500 mt-2">Debug: Recipe count: {{ count($recipes) }}</p>
+                <p class="text-xs text-gray-500">Search term: "{{ $search }}"</p>
+            @endif
         </div>
     @else
         <div class="grid grid-cols-1 gap-4">
+            @if(config('app.debug'))
+                <flux:callout variant="info" icon="information-circle" heading="Debug: {{ count($recipes) }} recipes loaded" />
+            @endif
+
             @foreach($recipes as $recipe)
                 <div class="bg-white dark:bg-white/10 border border-zinc-200 dark:border-white/10 [:where(&)]:p-6 [:where(&)]:rounded-xl space-y-6">
                     <div class="flex items-start space-x-4">
