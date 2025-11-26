@@ -139,12 +139,8 @@ class extends Component {
         $this->previewingRecipe = $recipeId;
         $this->previewData = $recipe;
 
-        // Store scroll position and close catalog modal
+        // Store scroll position for restoration later
         $this->dispatch('store-scroll-position');
-        \Flux::modal('import-from-trmnl-catalog')->close();
-
-        // Open preview modal
-        $this->dispatch('open-preview-modal');
     }
 
     public function closePreview(): void
@@ -152,9 +148,7 @@ class extends Component {
         $this->previewingRecipe = '';
         $this->previewData = [];
 
-        // Close preview modal and restore catalog modal
-        $this->dispatch('close-preview-modal');
-        \Flux::modal('import-from-trmnl-catalog')->open();
+        // Restore scroll position when returning to catalog
         $this->dispatch('restore-scroll-position');
     }
 
@@ -252,12 +246,14 @@ class extends Component {
                                 @endif
 
                                 @if($recipe['id'])
-                                    <flux:button
-                                        wire:click="previewRecipe('{{ $recipe['id'] }}')"
-                                        variant="subtle"
-                                        icon="eye">
-                                        Preview
-                                    </flux:button>
+                                    <flux:modal.trigger name="trmnl-catalog-preview">
+                                        <flux:button
+                                            wire:click="previewRecipe('{{ $recipe['id'] }}')"
+                                            variant="subtle"
+                                            icon="eye">
+                                            Preview
+                                        </flux:button>
+                                    </flux:modal.trigger>
                                 @endif
 
                                 @if($recipe['detail_url'])
@@ -281,7 +277,9 @@ class extends Component {
         @if($previewingRecipe && !empty($previewData))
             <div class="flex items-center justify-between">
                 <flux:heading size="lg">Preview {{ $previewData['name'] ?? 'Recipe' }}</flux:heading>
-                <flux:button wire:click="closePreview" variant="ghost" icon="x-mark"></flux:button>
+                <flux:modal.close>
+                    <flux:button wire:click="closePreview" variant="ghost" icon="x-mark"></flux:button>
+                </flux:modal.close>
             </div>
 
             <div class="space-y-4">
@@ -323,9 +321,11 @@ class extends Component {
                 @endif
 
                 <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <flux:button wire:click="closePreview" variant="subtle">
-                        Back to Catalog
-                    </flux:button>
+                    <flux:modal.close>
+                        <flux:button wire:click="closePreview" variant="subtle">
+                            Back to Catalog
+                        </flux:button>
+                    </flux:modal.close>
                     <div class="flex items-center space-x-3">
                         @if($previewData['detail_url'])
                             <flux:button
@@ -335,11 +335,13 @@ class extends Component {
                                 View on TRMNL
                             </flux:button>
                         @endif
-                        <flux:button
-                            wire:click="installPlugin('{{ $previewingRecipe }}')"
-                            variant="primary">
-                            Install Recipe
-                        </flux:button>
+                        <flux:modal.close>
+                            <flux:button
+                                wire:click="installPlugin('{{ $previewingRecipe }}')"
+                                variant="primary">
+                                Install Recipe
+                            </flux:button>
+                        </flux:modal.close>
                     </div>
                 </div>
             </div>
@@ -370,17 +372,29 @@ class extends Component {
         }, 100);
     });
 
-    $wire.on('open-preview-modal', () => {
-        // Use Flux modal API to open preview modal
-        if (window.Flux && window.Flux.modal) {
-            window.Flux.modal('trmnl-catalog-preview').open();
-        }
-    });
+    // Listen for when the catalog modal is opened and restore scroll position
+    document.addEventListener('DOMContentLoaded', function() {
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'data-flux-modal-open') {
+                    const target = mutation.target;
+                    if (target.getAttribute('data-flux-modal') === 'import-from-trmnl-catalog' &&
+                        target.getAttribute('data-flux-modal-open') === 'true') {
+                        // Modal was opened, restore scroll position
+                        setTimeout(() => {
+                            const scrollContainer = target.querySelector('.space-y-4') || target;
+                            if (trmnlCatalogScrollPosition > 0) {
+                                scrollContainer.scrollTop = trmnlCatalogScrollPosition;
+                            }
+                        }, 100);
+                    }
+                }
+            });
+        });
 
-    $wire.on('close-preview-modal', () => {
-        // Use Flux modal API to close preview modal
-        if (window.Flux && window.Flux.modal) {
-            window.Flux.modal('trmnl-catalog-preview').close();
+        const catalogModal = document.querySelector('[data-flux-modal="import-from-trmnl-catalog"]');
+        if (catalogModal) {
+            observer.observe(catalogModal, { attributes: true });
         }
     });
 </script>
